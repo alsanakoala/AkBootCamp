@@ -1,4 +1,5 @@
 Metro Ağı Rota Bulucu
+
 📌 Proje Açıklaması
 Bu proje, bir metro ağı içindeki istasyonlar arasında en hızlı ve en az aktarmalı rotayı bulmayı amaçlamaktadır. Kullanıcı, başlangıç ve hedef istasyonları belirleyerek en uygun rotayı öğrenebilir.
 Proje, bir metro sisteminin bağlantılarını bir grafik (graph) olarak ele alarak farklı algoritmalarla analiz etmektedir. Genişlik Öncelikli Arama (BFS) en az aktarmalı rotayı bulurken, A algoritması (heuristicsiz Dijkstra)* en hızlı rotayı bulmak için kullanılmıştır.
