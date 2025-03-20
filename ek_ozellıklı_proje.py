@@ -8,8 +8,6 @@ try:
     import tkinter as tk
     from tkinter import ttk
 except ImportError:
-    # Sunucu ortamı veya farklı Python dağıtımı kullanılıyor olabilir.
-    # GUI kullanılmadığı durumda bu import hatası görmezden gelinebilir.
     tk = None
     ttk = None
 
@@ -23,7 +21,6 @@ class Istasyon:
         self.hat = hat
         self.x = x
         self.y = y
-        # komsular, (istasyon, süre) tuple'larını tutar
         self.komsular: List[Tuple['Istasyon', int]] = []
 
     def komsu_ekle(self, istasyon: 'Istasyon', sure: int):
@@ -33,12 +30,8 @@ class MetroAgi:
     def __init__(self):
         self.istasyonlar: Dict[str, Istasyon] = {}
         self.hatlar: Dict[str, List[Istasyon]] = defaultdict(list)
-        # Gecikmeler: (id1, id2) -> ekstra_sure
         self.delays: Dict[Tuple[str, str], int] = {}
 
-    # ----------------------------------------------------------------
-    #  (1) İSTASYON EKLEME
-    # ----------------------------------------------------------------
     def istasyon_ekle(self, idx: str, ad: str, hat: str, x: float = 0.0, y: float = 0.0) -> None:
         if idx not in self.istasyonlar:
             istasyon = Istasyon(idx, ad, hat, x, y)
@@ -51,9 +44,6 @@ class MetroAgi:
         istasyon1.komsu_ekle(istasyon2, sure)
         istasyon2.komsu_ekle(istasyon1, sure)
 
-    # ----------------------------------------------------------------
-    #  (2) BFS (EN AZ AKTARMALI ROTA)
-    # ----------------------------------------------------------------
     def en_az_aktarma_bul(self, baslangic_id: str, hedef_id: str) -> Optional[List[Istasyon]]:
         """BFS kullanarak en az aktarmalı (en kısa kenar sayılı) rotayı bulur."""
         if baslangic_id not in self.istasyonlar or hedef_id not in self.istasyonlar:
@@ -68,7 +58,7 @@ class MetroAgi:
         while kuyruk:
             istasyon, yol = kuyruk.popleft()
             if istasyon == hedef:
-                return yol  # BFS en az aktarmalı yolu bulur
+                return yol 
 
             for komsu, _ in istasyon.komsular:
                 if komsu not in ziyaret_edildi:
@@ -77,9 +67,6 @@ class MetroAgi:
 
         return None
 
-    # ----------------------------------------------------------------
-    #  (3) A* (EN HIZLI ROTA) - HEURISTIKLİ VEYA HEURISTIKSİZ
-    # ----------------------------------------------------------------
     def _heuristic(self, current: Istasyon, hedef: Istasyon) -> float:
         """
         Basit Öklid mesafesi (kuş uçuşu).
@@ -106,25 +93,17 @@ class MetroAgi:
 
         baslangic = self.istasyonlar[baslangic_id]
         hedef = self.istasyonlar[hedef_id]
-
-        # g_score: bir istasyona ulaşmak için bilinen en kısa/toplam süre
         g_score = {baslangic: 0}
-        # Farklı rotaları sıralamak için bir öncelik kuyruğu
-        # Eleman: (f(n), sabit_id, current_station, path)
         pq = [(0, id(baslangic), baslangic, [baslangic])]
 
         while pq:
             f_deger, _, current_station, yol = heapq.heappop(pq)
-            # current_station için bilinen en iyi g_score
             current_sure = g_score[current_station]
 
-            # Eğer hedefe ulaştıysak, rota ve toplam süre döndür
             if current_station == hedef:
                 return (yol, current_sure)
 
-            # Komşu istasyonlara geç
             for komsu, edge_sure in current_station.komsular:
-                # Gecikmeler eklenmiş olabilir
                 extra_delay = self._get_delay(current_station.idx, komsu.idx)
                 tentative_g = current_sure + edge_sure + extra_delay
 
@@ -136,9 +115,6 @@ class MetroAgi:
 
         return None
 
-    # ----------------------------------------------------------------
-    #  (4) GERÇEK ZAMANLI DURUMLAR / EK GECİKMELER
-    # ----------------------------------------------------------------
     def set_delay(self, istasyon1_id: str, istasyon2_id: str, delay: int) -> None:
         """
         Metro ağındaki iki istasyon arasına ek gecikme tanımlanır.
@@ -153,9 +129,6 @@ class MetroAgi:
             istasyon1_id, istasyon2_id = istasyon2_id, istasyon1_id
         return self.delays.get((istasyon1_id, istasyon2_id), 0)
 
-    # ----------------------------------------------------------------
-    #  (5) VERİ GİRİŞ / ÇIKIŞ (JSON)
-    # ----------------------------------------------------------------
     def yukle_json(self, file_path: str) -> None:
         """
         JSON formatı örnek:
@@ -173,7 +146,6 @@ class MetroAgi:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Önce istasyonları ekle
         for st in data["stations"]:
             self.istasyon_ekle(
                 st["idx"], 
@@ -183,7 +155,6 @@ class MetroAgi:
                 float(st.get("y", 0))
             )
 
-        # Sonra bağlantıları ekle
         for conn in data["connections"]:
             s1 = conn["s1"]
             s2 = conn["s2"]
@@ -205,7 +176,6 @@ class MetroAgi:
             })
 
         connections_data = []
-        # Her bağlantıyı iki kez kaydetmeyi önlemek için set:
         seen_pairs = set()
         for idx, ist in self.istasyonlar.items():
             for komsu, sure in ist.komsular:
@@ -226,9 +196,6 @@ class MetroAgi:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
 
-    # ----------------------------------------------------------------
-    #  (6) ÇOKLU KRİTER ANALİZ (Örnek: Süre + Aktarma)
-    # ----------------------------------------------------------------
     def en_uygun_rota(
         self, 
         baslangic_id: str, 
@@ -245,8 +212,6 @@ class MetroAgi:
 
         baslangic = self.istasyonlar[baslangic_id]
         hedef = self.istasyonlar[hedef_id]
-
-        # cost sözlüğü, bir istasyona ulaşmak için bulunan en iyi toplam maliyeti tutar
         cost = {baslangic: 0}
         pq = [(0, id(baslangic), baslangic, [baslangic])]
 
@@ -260,7 +225,6 @@ class MetroAgi:
 
             for komsu, edge_sure in current_station.komsular:
                 extra_delay = self._get_delay(current_station.idx, komsu.idx)
-                # Hat değişimi varsa aktarma cezası ekle
                 penalty = aktarma_cezasi if (current_station.hat != komsu.hat) else 0
                 yeni_maliyet = current_cost + edge_sure + extra_delay + penalty
 
@@ -270,9 +234,6 @@ class MetroAgi:
 
         return None
 
-    # ----------------------------------------------------------------
-    #  (7) KOD İYİLEŞTİRMELERİ
-    # ----------------------------------------------------------------
     @staticmethod
     def print_route(rota: List[Istasyon]) -> str:
         """
@@ -287,24 +248,15 @@ class MetroAgi:
             if i == 0:
                 output_names.append(ist.ad)
             else:
-                # Eğer ad bir önceki ile aynıysa (farklı hat da olsa), tekrar yazma
                 if ist.ad != rota[i-1].ad:
                     output_names.append(ist.ad)
                 else:
-                    # Eğer istasyon adı aynıysa, parantez içinde hat belirtilebilir:
                     output_names.append(f"({ist.hat})")
         return " -> ".join(output_names)
 
-# ----------------------------------------------------------------
-#  ÖRNEK KULLANIM
-# ----------------------------------------------------------------
 if __name__ == "__main__":
-    # Yeni bir metro ağı
     metro = MetroAgi()
 
-    # Örnek olarak, sabit ekleme yerine JSON'dan da yüklenebilir.
-    # Bu sefer manuel ekleyelim:
-    # Koordinatlar hayali değerler, sadece heuristik gösterimi için var.
     metro.istasyon_ekle("K1", "Kızılay", "Kırmızı Hat", 0, 0)
     metro.istasyon_ekle("K2", "Ulus", "Kırmızı Hat", 1, 1)
     metro.istasyon_ekle("K3", "Demetevler", "Kırmızı Hat", 2, 2)
@@ -320,7 +272,6 @@ if __name__ == "__main__":
     metro.istasyon_ekle("T3", "Gar", "Turuncu Hat", 1, 2)
     metro.istasyon_ekle("T4", "Keçiören", "Turuncu Hat", 1, 3)
 
-    # Bağlantılar
     metro.baglanti_ekle("K1", "K2", 4)
     metro.baglanti_ekle("K2", "K3", 6)
     metro.baglanti_ekle("K3", "K4", 8)
@@ -330,43 +281,31 @@ if __name__ == "__main__":
     metro.baglanti_ekle("T1", "T2", 7)
     metro.baglanti_ekle("T2", "T3", 9)
     metro.baglanti_ekle("T3", "T4", 5)
-    # Aktarma bağlantıları
     metro.baglanti_ekle("K1", "M2", 2)
     metro.baglanti_ekle("K3", "T2", 3)
     metro.baglanti_ekle("M4", "T3", 2)
 
-    # Örnek bir gecikme ekleyelim: K2-K3 arası 2 dk gecikme
     metro.set_delay("K2", "K3", 2)
 
-    # BFS testi
     rota_bfs = metro.en_az_aktarma_bul("M1", "K4")
     if rota_bfs:
         print("BFS (En Az Aktarma) Rota:", MetroAgi.print_route(rota_bfs))
 
-    # A* testi - heuristik devre dışı (Dijkstra gibi)
     rota_a_star_none = metro.en_hizli_rota_bul("M1", "K4", use_heuristic=False)
     if rota_a_star_none:
         stations, sure = rota_a_star_none
         print(f"A* (Heuristic=Off) Rota: {MetroAgi.print_route(stations)} (Süre: {sure})")
 
-    # A* testi - heuristik aktif
     rota_a_star_heur = metro.en_hizli_rota_bul("M1", "K4", use_heuristic=True)
     if rota_a_star_heur:
         stations, sure = rota_a_star_heur
         print(f"A* (Heuristic=On)  Rota: {MetroAgi.print_route(stations)} (Süre: {sure})")
 
-    # Çoklu kriter analizi (süre + hat değiştirme cezası)
     rota_combo = metro.en_uygun_rota("M1", "K4", aktarma_cezasi=5)
     if rota_combo:
         stations, cost_val = rota_combo
         print(f"Çoklu Kriter Rota: {MetroAgi.print_route(stations)} (Maliyet: {cost_val})")
 
-    # ----------------------------------------------------------------
-    #  Basit Bir Tkinter Arayüzü (Kullanıcıdan Başlangıç & Hedef Seçme)
-    # ----------------------------------------------------------------
-    # Not: Sunucu veya notebook ortamlarında bazen Tkinter desteklenmeyebilir.
-    # Bu kısım desteklenmiyorsa import hatası alabilirsiniz.
-    # Lokal makinenizde python dosyasını çalıştırarak deneyebilirsiniz.
     if tk and ttk:
         def run_gui(metro_obj: MetroAgi):
             window = tk.Tk()
@@ -405,7 +344,5 @@ if __name__ == "__main__":
             tk.Button(window, text="Rota Bul", command=find_routes).grid(row=2, column=0, columnspan=2, pady=5)
 
             window.mainloop()
-
-        # GUI'yi çalıştır
         run_gui(metro)
 
